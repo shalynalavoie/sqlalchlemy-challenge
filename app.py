@@ -1,92 +1,92 @@
-import numpy as np 
+import numpy as np
+import datetime as dt
+import pandas as pd
+
 import sqlalchemy
 from sqlalchemy.ext.automap import automap_base
 from sqlalchemy.orm import Session
 from sqlalchemy import create_engine, func
+
 from flask import Flask, jsonify
 
-#Database setup
-engine = create_engine("sqlite:///resources/hawaii.sqlite")
+
+# Database Setup
+engine = create_engine("sqlite:///Resources/hawaii.sqlite")
+
+# reflect an existing database into a new model
 Base = automap_base()
-Base.prepare(engine, reflect= True)
-#Save references to each table
-Base.classes.keys()
+# reflect the tables
+Base.prepare(engine, reflect=True)
+
+# Save reference to the table
 Measurement = Base.classes.measurement
 Station = Base.classes.station
 
-#Create session from Python to DB
+#Create our session from Python to the DB
 session = Session(engine)
 
-#Flask Setup
+# Flask Setup
 app = Flask(__name__)
 
-#Flask routes
+
+#Flask Routes
 @app.route("/")
-def welcome():
+def home():
     """List all available api routes."""
     return (
         f"Available Routes:<br/>"
         f"/api/v1.0/precipitation<br/>"
         f"/api/v1.0/stations<br/>"
         f"/api/v1.0/tobs<br/>"
-        f"/api/v1.0/<start><br/>"
-        f"/api/v1.0/<start>/<end>"
+        f"/api/v1.0/start<br/>"
+        f"/api/v1.0/start/end<br/>"
     )
 
 @app.route("/api/v1.0/precipitation")
 def precipitation():
-    """Let's look into the precipitation data."""
-    precip_results = session.query(Measurement.date, Measurement.prcp).all()
-    return jsonify(precip_results)
+    """Lets look into the precipitation data."""
+    #Query last 12 months prcp data
+    precip_results = session.query(Measurement.date, Measurement.prcp).filter(Measurement.date >= "2016-08-24").group_by(Measurement.date).all()
+    prcp_data = []
+    for date, prcp in precip_results:
+        prcp_dict = {}
+        prcp_dict["date"] = date
+        prcp_dict["prcp"] = prcp
+        prcp_data.append(prcp_dict)
+    return jsonify(prcp_data)
 
 @app.route("/api/v1.0/stations")
 def station():
-     stat_results + session.query(Station.station, Station.name).all()
-     return jsonify(stat_results)
-
+    station_activity = session.query(Station.station, Station.name).all()
+    #stat_data = pd.read_sql(stat_results.statement, stat_results.session.bind)
+    return jsonify(station_activity)
 
 @app.route("/api/v1.0/tobs")
 def tobs():
-    print("Server received request for tobs...")
+    #12 month earlier
+    year_earlier_date = '2016-08-23'
 
-    # query temperature readings for last year, based on start date calculated earlier in notebook
-    tobs_results = session.query(Measurement.date, Measurement.tobs).\
-        filter(Measurement.station == station_most_active).\
-        filter(Measurement.date >= start_date).all()
+    #Most active station
+    most_active_stid = 'USC00519281'
+    year_data = session.query(Measurement.date, Measurement.tobs).filter(Measurement.date >= "2016-08-24").filter(Measurement.station == most_active_stid).order_by(Measurement.tobs).all()
+    return jsonify(year_data) 
 
-      # convert to a dataframe
-    tobs_df = pd.DataFrame(tobs_results, columns=["Date", "Tobs"]).set_index("Date")
-    tobs_df = tobs_df.sort_values("Date")
-    tobs_dict = tobs_df.T.to_dict()
-
-    return jsonify(tobs_dict)
-
-
-    # show aggregate temperature data from a user-defined start date in URL,
-# by calling provided function with an end date of 9999-12-31.  May have to revisit
-# this approach in ~8000 years.
 @app.route("/api/v1.0/<start>")
-def start_temps(start):
+def start_date(start):
+    session = Session(engine)
+    station_number = session.query(func.min(Measurement.tobs), func.avg(Measurement.tobs), func.max(Measurement.tobs)).filter(Measurement.date >= start).all()
+    session.close()
+    return jsonify(station_number)
+    
 
-    temp_results = calc_temps(start, "9999-12-01")
-
-    temp_df = pd.DataFrame(temp_results, columns=["TMin", "TAvg", "TMax"])
-    temp_dict = temp_df.T.to_dict()
-
-    return jsonify(temp_dict)
-
-# show aggregate temperature data from a user-defined start date 
-# and end date in URL, by calling provided function
 @app.route("/api/v1.0/<start>/<end>")
-def start_end_temps(start, end):
+def startend_date(start,end):
+    session = Session(engine)
+    station_number = session.query(func.min(Measurement.tobs), func.avg(Measurement.tobs), func.max(Measurement.tobs)).filter(Measurement.date >= start).filter(Measurement.date <= end).all()
+    session.close()
+    return jsonify(station_number)
 
-    temp_results = calc_temps(start, end)
+session.close()
 
-    temp_df = pd.DataFrame(temp_results, columns=["TMin", "TAvg", "TMax"])
-    temp_dict = temp_df.T.to_dict()
-
-    return jsonify(temp_dict)
-
-# run the flask page
 if __name__ == "__main__":
-    app.run(debug=True)             
+    app.run(debug=True)         
